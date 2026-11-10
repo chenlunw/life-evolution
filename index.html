@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>生命</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    background: #faf8ef;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .container {
+    width: 500px;
+    max-width: 95vw;
+    padding: 20px;
+  }
+
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+  }
+
+  .title {
+    font-size: 64px;
+    font-weight: 800;
+    color: #776e65;
+    line-height: 1;
+  }
+
+  .scores {
+    display: flex;
+    gap: 8px;
+  }
+
+  .score-box {
+    background: #bbada0;
+    color: #fff;
+    border-radius: 6px;
+    padding: 8px 20px;
+    text-align: center;
+    min-width: 80px;
+  }
+
+  .score-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    opacity: 0.8;
+  }
+
+  .score-value {
+    font-size: 24px;
+    font-weight: 700;
+  }
+
+  .sub-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+
+  .desc {
+    color: #776e65;
+    font-size: 15px;
+  }
+
+  .desc strong { font-weight: 700; }
+
+  .btn {
+    background: #8f7a66;
+    color: #f9f6f2;
+    border: none;
+    border-radius: 6px;
+    padding: 10px 22px;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .btn:hover { background: #9f8b77; }
+  .btn:active { transform: scale(0.96); }
+
+  .board {
+    position: relative;
+    background: #bbada0;
+    border-radius: 8px;
+    padding: 12px;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    grid-template-rows: repeat(4, 1fr);
+    gap: 12px;
+    aspect-ratio: 1;
+  }
+
+  .cell {
+    background: rgba(238, 228, 218, 0.35);
+    border-radius: 6px;
+  }
+
+  .tile-container {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+  }
+
+  .tile {
+    position: absolute;
+    border-radius: 6px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-weight: 700;
+    transition: transform 100ms ease-in-out, left 100ms ease-in-out, top 100ms ease-in-out;
+    z-index: 1;
+  }
+
+  .tile-merged {
+    z-index: 2;
+    animation: pop 200ms ease;
+  }
+
+  .tile-new {
+    animation: appear 200ms ease;
+  }
+
+  @keyframes pop {
+    0%   { transform: scale(1); }
+    50%  { transform: scale(1.2); }
+    100% { transform: scale(1); }
+  }
+
+  @keyframes appear {
+    0%   { transform: scale(0); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+
+  .overlay {
+    position: absolute;
+    inset: 0;
+    border-radius: 8px;
+    background: rgba(238, 228, 218, 0.73);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 10;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.4s;
+  }
+
+  .overlay.active {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .overlay-text {
+    font-size: 48px;
+    font-weight: 800;
+    color: #776e65;
+    margin-bottom: 16px;
+  }
+
+  .win .overlay-text { color: #edc22e; }
+
+  @media (max-width: 520px) {
+    .title { font-size: 42px; }
+    .board { gap: 8px; padding: 8px; }
+    .tile-container { top: 8px; left: 8px; right: 8px; bottom: 8px; }
+    .score-box { padding: 6px 14px; min-width: 64px; }
+    .score-value { font-size: 20px; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <div class="title">生命</div>
+    <div class="scores">
+      <div class="score-box">
+        <div class="score-label">分数</div>
+        <div class="score-value" id="score">0</div>
+      </div>
+      <div class="score-box">
+        <div class="score-label">最高分</div>
+        <div class="score-value" id="best">0</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sub-header">
+    <div class="desc">从细胞开始，进化到 <strong>wgw</strong>！</div>
+    <button class="btn" id="restart">重新开始</button>
+  </div>
+
+  <div class="board" id="board">
+    <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+    <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+    <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+    <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+    <div class="tile-container" id="tileContainer"></div>
+    <div class="overlay" id="overlay">
+      <div class="overlay-text" id="overlayText"></div>
+      <button class="btn" id="overlayBtn">再来一局</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const SIZE = 4;
+const WIN_VALUE = 2048;
+
+// 数字 → 名称映射
+const names = {
+  2:     '细胞',
+  4:     '草履虫',
+  8:     '多细胞',
+  16:    '哺乳类',
+  32:    '家猫',
+  64:    '银渐层',
+  128:   '十一',
+  256:   '能人',
+  512:   '文静',
+  1024:  '智人',
+  2048:  'wgw',
+};
+
+let grid = [];
+let score = 0;
+let best = 0;
+let mergedPositions = new Set();
+let movedThisTurn = false;
+let gameOver = false;
+let won = false;
+
+// ------------------ 颜色表 ------------------
+const tileStyles = {};
+[
+  [0,    '#cdc1b4', '#cdc1b4'],
+  [2,    '#e8f5e9', '#2e7d32'],
+  [4,    '#c8e6c9', '#2e7d32'],
+  [8,    '#a5d6a7', '#1b5e20'],
+  [16,   '#81c784', '#1b5e20'],
+  [32,   '#66bb6a', '#fff'],
+  [64,   '#4caf50', '#fff'],
+  [128,  '#43a047', '#fff'],
+  [256,  '#388e3c', '#fff'],
+  [512,  '#2e7d32', '#fff'],
+  [1024, '#1b5e20', '#fff'],
+  [2048, '#ffd54f', '#5d4037'],
+  [4096, '#ff7043', '#fff'],
+  [8192, '#e53935', '#fff'],
+].forEach(([v, bg, fg]) => {
+  tileStyles[v] = { bg, fg };
+});
+
+// ------------------ DOM ------------------
+const boardEl = document.getElementById('board');
+const tileContainer = document.getElementById('tileContainer');
+const scoreEl = document.getElementById('score');
+const bestEl = document.getElementById('best');
+const overlay = document.getElementById('overlay');
+const overlayText = document.getElementById('overlayText');
+const overlayBtn = document.getElementById('overlayBtn');
+
+// ------------------ 初始化 ------------------
+function init() {
+  grid = Array.from({ length: SIZE }, () => Array(SIZE).fill(0));
+  score = 0;
+  mergedPositions = new Set();
+  movedThisTurn = false;
+  gameOver = false;
+  won = false;
+  overlay.classList.remove('active', 'win');
+
+  best = Math.max(best, parseInt(localStorage.getItem('life-best')) || 0);
+  bestEl.textContent = best;
+  scoreEl.textContent = '0';
+
+  addRandomTile();
+  addRandomTile();
+  render();
+}
+
+// ------------------ 渲染 ------------------
+function render() {
+  const cellSize = (boardEl.clientWidth - 12 * 2 - 12 * 3) / 4;
+  if (cellSize <= 0) { requestAnimationFrame(render); return; }
+
+  tileContainer.innerHTML = '';
+
+  for (let r = 0; r < SIZE; r++) {
+    for (let c = 0; c < SIZE; c++) {
+      if (grid[r][c] === 0) continue;
+      const val = grid[r][c];
+      const style = tileStyles[val] || tileStyles[8192];
+      const posKey = `${r},${c}`;
+      const isMerged = mergedPositions.has(posKey);
+
+      const name = names[val] || val;
+      const len = name.length;
+      // 根据字数调整字号
+      let fontSize;
+      if (len <= 1) fontSize = cellSize * 0.45;
+      else if (len === 2) fontSize = cellSize * 0.32;
+      else fontSize = cellSize * 0.24;
+
+      const div = document.createElement('div');
+      div.className = 'tile' + (isMerged ? ' tile-merged' : '');
+      div.style.cssText = `
+        width:${cellSize}px; height:${cellSize}px;
+        top:${r * (cellSize + 12)}px; left:${c * (cellSize + 12)}px;
+        background:${style.bg}; color:${style.fg};
+        font-size:${fontSize}px;
+        line-height:1.2;
+      `;
+      div.textContent = name;
+      tileContainer.appendChild(div);
+    }
+  }
+
+  const tiles = tileContainer.querySelectorAll('.tile');
+  tiles.forEach(t => {
+    if (!t.classList.contains('tile-merged')) {
+      t.classList.add('tile-new');
+    }
+  });
+}
+
+// ------------------ 随机添加方块 ------------------
+function addRandomTile() {
+  const empty = [];
+  for (let r = 0; r < SIZE; r++)
+    for (let c = 0; c < SIZE; c++)
+      if (grid[r][c] === 0) empty.push([r, c]);
+
+  if (empty.length === 0) return;
+
+  const [r, c] = empty[Math.floor(Math.random() * empty.length)];
+  grid[r][c] = Math.random() < 0.9 ? 2 : 4;
+}
+
+// ------------------ 移动逻辑 ------------------
+function slide(row) {
+  let arr = row.filter(v => v !== 0);
+  const merged = [];
+  for (let i = 0; i < arr.length - 1; i++) {
+    if (arr[i] === arr[i + 1]) {
+      arr[i] *= 2;
+      score += arr[i];
+      merged.push(i);
+      arr[i + 1] = 0;
+      i++;
+    }
+  }
+  arr = arr.filter(v => v !== 0);
+  while (arr.length < SIZE) arr.push(0);
+  return { result: arr, merged };
+}
+
+function move(direction) {
+  mergedPositions.clear();
+  movedThisTurn = false;
+  const old = grid.map(r => [...r]);
+
+  for (let i = 0; i < SIZE; i++) {
+    let line, targetR, targetC, isRow;
+
+    if (direction === 'left') {
+      line = grid[i];
+      targetR = i; isRow = true;
+    } else if (direction === 'right') {
+      line = [...grid[i]].reverse();
+      targetR = i; isRow = true;
+    } else if (direction === 'up') {
+      line = grid.map(r => r[i]);
+      targetC = i; isRow = false;
+    } else {
+      line = grid.map(r => r[i]).reverse();
+      targetC = i; isRow = false;
+    }
+
+    const { result, merged } = slide(line);
+
+    if (direction === 'right' || direction === 'down') result.reverse();
+
+    if (isRow) {
+      grid[targetR] = result;
+      merged.forEach(mIdx => {
+        const col = direction === 'left' ? mIdx : SIZE - 1 - mIdx;
+        mergedPositions.add(`${targetR},${col}`);
+      });
+    } else {
+      for (let r = 0; r < SIZE; r++) {
+        grid[r][targetC] = result[r];
+      }
+      merged.forEach(mIdx => {
+        const row = direction === 'down' ? SIZE - 1 - mIdx : mIdx;
+        mergedPositions.add(`${row},${targetC}`);
+      });
+    }
+  }
+
+  for (let r = 0; r < SIZE; r++)
+    for (let c = 0; c < SIZE; c++)
+      if (grid[r][c] !== old[r][c]) movedThisTurn = true;
+
+  if (movedThisTurn) {
+    addRandomTile();
+    render();
+    updateScore();
+    checkState();
+  }
+}
+
+// ------------------ 状态检测 ------------------
+function canMove() {
+  for (let r = 0; r < SIZE; r++) {
+    for (let c = 0; c < SIZE; c++) {
+      if (grid[r][c] === 0) return true;
+      if (c < SIZE - 1 && grid[r][c] === grid[r][c + 1]) return true;
+      if (r < SIZE - 1 && grid[r][c] === grid[r + 1][c]) return true;
+    }
+  }
+  return false;
+}
+
+function checkState() {
+  if (!won) {
+    for (let r = 0; r < SIZE; r++)
+      for (let c = 0; c < SIZE; c++)
+        if (grid[r][c] >= WIN_VALUE) {
+          won = true;
+          showOverlay('进化完成！', true);
+          return;
+        }
+  }
+
+  if (!canMove()) {
+    gameOver = true;
+    showOverlay('进化终止', false);
+  }
+}
+
+function showOverlay(text, isWin) {
+  overlayText.textContent = text;
+  overlay.classList.add('active');
+  if (isWin) overlay.classList.add('win');
+  else overlay.classList.remove('win');
+}
+
+function updateScore() {
+  scoreEl.textContent = score;
+  if (score > best) {
+    best = score;
+    bestEl.textContent = best;
+    localStorage.setItem('life-best', best);
+  }
+}
+
+// ------------------ 事件 ------------------
+document.addEventListener('keydown', e => {
+  if (gameOver) return;
+  const map = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down' };
+  const dir = map[e.key];
+  if (dir) {
+    e.preventDefault();
+    move(dir);
+  }
+});
+
+let touchStartX = 0, touchStartY = 0;
+
+const board = document.getElementById('board');
+board.addEventListener('touchstart', e => {
+  touchStartX = e.touches[0].clientX;
+  touchStartY = e.touches[0].clientY;
+}, { passive: true });
+
+board.addEventListener('touchmove', e => {
+  e.preventDefault();
+}, { passive: false });
+
+board.addEventListener('touchend', e => {
+  if (gameOver) return;
+  const dx = e.changedTouches[0].clientX - touchStartX;
+  const dy = e.changedTouches[0].clientY - touchStartY;
+  const absDx = Math.abs(dx), absDy = Math.abs(dy);
+
+  if (Math.max(absDx, absDy) < 30) return;
+
+  if (absDx > absDy) {
+    move(dx > 0 ? 'right' : 'left');
+  } else {
+    move(dy > 0 ? 'down' : 'up');
+  }
+});
+
+document.getElementById('restart').addEventListener('click', init);
+overlayBtn.addEventListener('click', init);
+
+window.addEventListener('resize', render);
+
+// ------------------ 启动 ------------------
+init();
+</script>
+</body>
+</html>
